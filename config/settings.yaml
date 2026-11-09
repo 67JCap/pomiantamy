@@ -1,0 +1,77 @@
+# Общие настройки приложения
+app:
+  data_dir: ./data
+  log_level: INFO
+
+pipeline:
+  interval_minutes: 10          # период цикла ingest->sink
+  max_items_per_cycle: 200
+
+dedup:
+  method: embedding             # minhash | embedding | hybrid
+  similarity_threshold: 0.87    # порог склейки дублов (настраивается без кода)
+  event_window_hours: 24        # окно группировки одного события
+
+classify:
+  categories: [аварии, политические заявления, политические репрессии, ответы оппозиции, иное]
+  min_confidence: 0.6
+
+brief:
+  style: standard               # terse | standard | detailed
+  language: ru
+  max_sentences:
+    terse: 2
+    standard: 4
+    detailed: 8
+  include_links: true
+  include_media_counts: true
+
+credibility:
+  min_independent_sources: 2    # событие «подтверждено», если N независимых источников
+  source_weight_default: 0.5
+
+network:
+  proxy: null                   # напр. socks5://127.0.0.1:9050
+  timeout_sec: 20
+  retries: 3
+  user_agent_rotator: true
+  politeness_delay_sec: 2
+
+telegram:                       # Этап B + чтение каналов на Этапе A
+  api_id_env: TG_API_ID         # секреты только через env
+  api_hash_env: TG_API_HASH
+  channel_username: null        # куда публиковать (Этап B)
+
+# ==== ВЗАИМОЗАМЕНЯЕМЫЕ ИИ-БЭКЕНДЫ (единственная точка привязки к моделям) ====
+ai:
+  llm:
+    backend: ollama             # ollama | openai_compat | cloud_openai
+    model: "qwen2.5:7b-instruct"
+    base_url: "http://localhost:11434/v1"   # OpenAI-compatible endpoint
+    temperature: 0.1
+    max_tokens: 1024
+    fallback:
+      backend: openai_compat
+      model: "meta-llama/llama-3.1-8b-instruct"
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: OPENROUTER_API_KEY
+  embed:
+    backend: sentence_transformers
+    model: "cointegrated/rubert-tiny2"
+    device: auto                # cuda | cpu | auto
+  asr:
+    backend: faster_whisper
+    model: small                # tiny | base | small | medium
+    word_timestamps: true
+  tts:
+    backend: piper              # piper | xtts | elevenlabs
+    voice: "ru_RU-midia-medium"
+    output_dir: ./data/audio
+  vision:
+    backend: moondream          # moondream | gpt4o_vision
+    max_images_per_item: 4
+
+sinks:
+  - console
+  - jsonl
+  # - telegram_channel         # включить на Этапе B
