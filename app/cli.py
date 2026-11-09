@@ -22,6 +22,13 @@ def main():
 
     prev = sub.add_parser("preview", help="прогон на фикстурах (offline, fake-LLM)")
     prev.add_argument("fixture", help="JSON: [{title,text,url,source_id}]")
+    prev.add_argument("--video", action="store_true",
+                      help="дополнительно собрать тестовый видеоролик Этапа B (FakeTTS+ffmpeg)")
+
+    rnd = sub.add_parser("render", help="Этап B: собрать видео из JSONL-выкладок")
+    rnd.add_argument("--briefs", default="data/briefs.jsonl")
+    rnd.add_argument("--config", default="config/settings.yaml")
+    rnd.add_argument("--limit", type=int, default=5)
 
     args = p.parse_args()
 
@@ -41,6 +48,10 @@ def main():
     elif args.cmd == "preview":
         from app.pipeline.preview import run_preview
         asyncio.run(run_preview(args.fixture))
+
+    elif args.cmd == "render":
+        from app.render.cli_render import run_render
+        run_render(args.briefs, args.config, limit=args.limit)
 
     return 0
 

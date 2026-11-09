@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import sys
 from pathlib import Path
 
 from app.core.interfaces import IEmbedder, ILLM
@@ -78,9 +79,21 @@ async def run_preview(fixture_path: str) -> int:
 
     events: list[Event] = dedup.ingest(items)
     print(f"[preview] {len(items)} материалов -> {len(events)} событий")
+    briefs = []
     for ev in events:
         clf.classify(ev)
         brief = briefer.generate(ev)
+        briefs.append(brief)
         for s in sinks:
             await s.emit(brief)
+
+    if "--video" in sys.argv:
+        # Этап B offline: FakeTTS (ITTS) + ffmpeg — полный путь до mp4 без моделей
+        from app.ai.tts.fake import FakeTTS
+        from app.render.video_news import VideoNewsRenderer
+        renderer = VideoNewsRenderer(FakeTTS(), {"rewrite_script": False}, llm=None)
+        for br in briefs[:1]:
+            meta = renderer.render(br, images=[])
+            print(f"[preview][B] видео: {meta.get('video')} "
+                  f"(длительность {meta.get('duration')}, субтитры {meta['subtitles_srt']})")
     return len(events)
