@@ -24,19 +24,19 @@ class MediaType(str, Enum):
 @dataclass
 class MediaRef:
     type: MediaType
-    url: str                      # исходная ссылка (всегда сохраняем для выдачи пользователю)
-    local_path: Optional[str] = None   # путь после скачивания (media_harvest)
-    caption: Optional[str] = None      # из vision-модели (IVision.caption)
-    transcript: Optional[str] = None   # из ASR-модели (IASR.transcribe)
+    url: str
+    local_path: Optional[str] = None
+    caption: Optional[str] = None
+    transcript: Optional[str] = None
     sha256: Optional[str] = None
 
 
 @dataclass
 class NewsItem:
-    """Единица входящего сообщения от источника (ещё не событие)."""
+    """Единица входящего сообщения; content_status отражает полноту текста."""
     id: str
     source_id: str
-    url: str                                  # ссылка на первоисточник — обязательна
+    url: str
     title: str
     text: str
     published_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -44,6 +44,7 @@ class NewsItem:
     media: list[MediaRef] = field(default_factory=list)
     source_weight: float = 0.5
     tags: list[str] = field(default_factory=list)
+    content_status: str = "full"  # full | metadata_only
 
     @staticmethod
     def make_id(source_id: str, url: str) -> str:
@@ -53,12 +54,12 @@ class NewsItem:
 
 @dataclass
 class Event:
-    """Событие = кластер дублов NewsItem из одного или нескольких источников."""
+    """Событие = кластер дублей NewsItem из одного или нескольких источников."""
     event_id: str
     items: list[NewsItem]
     category: Optional[Category] = None
     confidence: float = 0.0
-    confirmed_by: int = 0                     # число независимых источников
+    confirmed_by: int = 0
     geoloc: Optional[str] = None
 
     @property
@@ -70,11 +71,11 @@ class Event:
 class Brief:
     """Настраиваемая краткая выкладка — финальный продукт Этапа A."""
     event_id: str
-    style: str                                # terse | standard | detailed
+    style: str
     text: str
-    links: list[str]                          # ссылки на все источники события
-    media: list[MediaRef]                     # картинки/видео, связанные с новостью
+    links: list[str]
+    media: list[MediaRef]
     category: Category
     confirmed_by: int
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    model_used: str = ""                      # метаданные: какая модель сгенерировала
+    model_used: str = ""

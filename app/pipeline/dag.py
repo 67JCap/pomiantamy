@@ -1,8 +1,4 @@
-"""Оркестратор пайплайна: ingest -> dedup -> classify -> brief -> sinks.
-
-Компоненты внедряются через registry (DI из YAML) — здесь нет ни одного
-имени модели или источника.
-"""
+"""Оркестратор пайплайна: ingest -> dedup -> classify -> brief -> sinks."""
 from __future__ import annotations
 
 import asyncio
@@ -20,7 +16,7 @@ class Config:
     def __init__(self, path: str = "config/settings.yaml"):
         self.raw = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
 
-    def __getitem__(self, k):  # sugar: cfg["ai"]["llm"]
+    def __getitem__(self, k):
         return self.raw[k]
 
     def get(self, *keys, default=None):
@@ -35,7 +31,11 @@ class Config:
 def load_sources() -> list[dict]:
     data = yaml.safe_load(Path("config/sources.yaml").read_text(encoding="utf-8"))
     defaults = data.get("defaults", {})
-    return [{**defaults, **s} for s in data["sources"] if s.get("enabled", True)]
+    return [
+        {**defaults, **source}
+        for source in data["sources"]
+        if source.get("enabled", defaults.get("enabled", True))
+    ]
 
 
 class Pipeline:
@@ -46,10 +46,8 @@ class Pipeline:
         self.http = HttpClient(proxy=net.get("proxy"), timeout=net.get("timeout_sec", 20),
                                retries=net.get("retries", 3),
                                politeness_delay=net.get("politeness_delay_sec", 2))
-        # ИИ-компоненты — только через registry + YAML
         self.llm = resolve_with_fallback("llm", cfg.get("ai", "llm"))
         self.embedder = resolve("embed", cfg.get("ai", "embed"))
-        # обработчики
         from app.process.dedup import Deduplicator
         from app.process.classify import Classifier, BriefGenerator
         self.dedup = Deduplicator(
@@ -63,17 +61,14 @@ class Pipeline:
             self.llm, style=cfg.get("brief", "style", default="standard"),
             max_sentences=cfg.get("brief", "max_sentences", default=None),
             language=cfg.get("brief", "language", default="ru"))
-        # скачивание картинок/видео для материалов (настраивается YAML-секцией)
         from app.process.media_harvest import MediaHarvester
         self.harvester = MediaHarvester(
             self.http, cfg.get("media_harvest", default={}),
             data_dir=cfg.get("app", "data_dir", default="./data"))
-        # sinks
         self.sinks = [resolve("sink", {"backend": name})
                       for name in cfg.get("sinks", default=["console"])]
         self._state_file = Path(cfg.get("app", "data_dir", default="./data")) / "state.json"
 
-    # --------- состояние: когда последний раз опрашивали источник ----------
     def _load_state(self) -> dict:
         return json.loads(self._state_file.read_text()) if self._state_file.exists() else {}
 
@@ -82,15 +77,13 @@ class Pipeline:
         self._state_file.write_text(json.dumps(st))
 
     def _build_sources(self) -> list:
-        """Плагин источника = класс ISource, зарегистрированный под cfg['type']."""
         import importlib
-
         from app.core.registry import _REG
         sources = []
         for scfg in load_sources():
             cls = _REG["source"].get(scfg["type"])
             if cls is None:
-                try:  # ленивая загрузка модуля плагина по имени типа
+                try:
                     importlib.import_module(f"app.ingest.{scfg['type']}")
                     cls = _REG["source"][scfg["type"]]
                 except (ModuleNotFoundError, KeyError):
@@ -102,37 +95,30 @@ class Pipeline:
     async def run_cycle(self) -> int:
         state = self._load_state()
         sources = self._build_sources()
-
-        # 1) INGEST (параллельно по всем источникам)
         tasks, ids = [], []
         for src in sources:
             since = state.get(src.cfg["id"], time.time() - 3600)
-            tasks.append(_safe_fetch(src, since)); ids.append(src.cfg["id"])
+            tasks.append(_safe_fetch(src, since))
+            ids.append(src.cfg["id"])
         results = await asyncio.gather(*tasks)
         items: list[NewsItem] = []
-        for sid, res in zip(ids, results):
+        for sid, result in zip(ids, results):
             state[sid] = time.time()
-            if res:
-                items += res
+            if result:
+                items += result
         self._save_state(state)
         print(f"[pipeline] собрано материалов: {len(items)}")
 
-        # 1.5) MEDIA HARVEST: скачать картинки/видео, чтобы выкладка несла файлы
         if self.cfg.get("media_harvest", "enabled", default=True):
-            items = list(await asyncio.gather(*[self.harvester.harvest(i) for i in items]))
+            items = list(await asyncio.gather(*[self.harvester.harvest(item) for item in items]))
 
-        # 2) DEDUP -> события
         new_events = self.dedup.ingest(items)
         print(f"[pipeline] новых событий: {len(new_events)}")
 
-        # 3) CLASSIFY + 4) BRIEF + 5) SINKS
-        min_src = self.cfg.get("credibility", "min_independent_sources", default=1)
         count = 0
-        for ev in new_events:
-            await asyncio.to_thread(self.classifier.classify, ev)
-            if ev.confirmed_by < min_src:   # не «подтверждено» — помечаем, но не скрываем
-                pass
-            brief = await asyncio.to_thread(self.briefer.generate, ev)
+        for event in new_events:
+            await asyncio.to_thread(self.classifier.classify, event)
+            brief = await asyncio.to_thread(self.briefer.generate, event)
             for sink in self.sinks:
                 await sink.emit(brief)
             count += 1
@@ -143,6 +129,6 @@ class Pipeline:
 async def _safe_fetch(src, since: float):
     try:
         return await src.fetch(since)
-    except Exception as e:  # noqa: BLE001
-        print(f"[pipeline] источник {src.cfg['id']} ошибся: {e}")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[pipeline] источник {src.cfg['id']} ошибся: {exc}")
         return []
