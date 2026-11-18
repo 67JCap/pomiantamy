@@ -1,10 +1,20 @@
 # Реестр источников. Новый источник = новая запись, код менять не нужно.
-# type: rss | telegram | scraper | youtube
+# Включён только проверенный Belsat sitemap; остальные источники можно включить отдельно.
 defaults:
-  enabled: true
+  enabled: false
   poll_minutes: 15
 
 sources:
+  - id: belsat_google_news
+    enabled: true
+    type: google_news_sitemap
+    url: "https://belsat.eu/shared/feed/google_news.php"
+    weight: 0.8
+    limit: 30
+    max_concurrency: 3
+    min_article_chars: 220
+    tags: [политические заявления, политические репрессии, ответы оппозиции]
+
   - id: nexta_live
     type: rss
     url: "https://nexta.live/rss.xml"
@@ -25,7 +35,7 @@ sources:
 
   - id: onliner_incidents
     type: scraper
-    url: "https://onliner.cafer/..."          # заменить на живой раздел ДТП
+    url: "https://onliner.cafer/..."
     item_selector: "article"
     title_selector: "h2 a"
     link_selector: "h2 a@href"
@@ -35,7 +45,7 @@ sources:
 
   - id: chats_dtp_by
     type: telegram
-    handle: "@dtp_by_chats"                    # заменить на актуальные чат-каналы ДТП
+    handle: "@dtp_by_chats"
     weight: 0.5
     media_download: true
     tags: [аварии]
