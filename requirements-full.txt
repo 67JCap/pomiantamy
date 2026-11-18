@@ -1,0 +1,8 @@
+-r requirements-core.txt
+telethon>=1.36          # чтение Telegram-источников + публикация канала (Этап B)
+yt-dlp>=2025.1.1        # видео из постов/статей
+sentence-transformers>=3.0   # эмбеддинги для дедупа (локально)
+faster-whisper>=1.0     # ASR: транскрипты видео + тайминги субтитров
+piper-tts>=1.2          # быстрый локальный TTS-диктор (CPU)
+playwright>=1.44        # JS-сайты без RSS (опционально)
+aiogram>=3.7            # бот-публикатор Этапа B (опционально, есть Telethon)

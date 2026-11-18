@@ -1,0 +1,8 @@
+data/raw/
+data/media/
+data/audio/
+data/sessions/
+data/*.jsonl
+data/state.json
+*.env
+__pycache__/

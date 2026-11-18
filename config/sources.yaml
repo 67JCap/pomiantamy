@@ -1,0 +1,41 @@
+# Реестр источников. Новый источник = новая запись, код менять не нужно.
+# type: rss | telegram | scraper | youtube
+defaults:
+  enabled: true
+  poll_minutes: 15
+
+sources:
+  - id: nexta_live
+    type: rss
+    url: "https://nexta.live/rss.xml"
+    weight: 0.9
+    tags: [политические заявления, политические репрессии]
+
+  - id: reform_belarus
+    type: telegram
+    handle: "@reformbel"
+    weight: 0.8
+    tags: [ответы оппозиции, политические заявления]
+
+  - id: belsat_eu
+    type: rss
+    url: "https://belsat.eu/feed/"
+    weight: 0.8
+    tags: [политические заявления, ответы оппозиции]
+
+  - id: onliner_incidents
+    type: scraper
+    url: "https://onliner.cafer/..."          # заменить на живой раздел ДТП
+    item_selector: "article"
+    title_selector: "h2 a"
+    link_selector: "h2 a@href"
+    image_selector: "img@src"
+    weight: 0.6
+    tags: [аварии]
+
+  - id: chats_dtp_by
+    type: telegram
+    handle: "@dtp_by_chats"                    # заменить на актуальные чат-каналы ДТП
+    weight: 0.5
+    media_download: true
+    tags: [аварии]

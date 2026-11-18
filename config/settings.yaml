@@ -1,0 +1,102 @@
+# Общие настройки приложения
+app:
+  data_dir: ./data
+  log_level: INFO
+
+pipeline:
+  interval_minutes: 10          # период цикла ingest->sink
+  max_items_per_cycle: 200
+
+dedup:
+  method: embedding             # minhash | embedding | hybrid
+  similarity_threshold: 0.87    # порог склейки дублов (настраивается без кода)
+  event_window_hours: 24        # окно группировки одного события
+
+classify:
+  categories: [аварии, политические заявления, политические репрессии, ответы оппозиции, иное]
+  min_confidence: 0.6
+
+brief:
+  style: standard               # terse | standard | detailed
+  language: ru
+  max_sentences:
+    terse: 2
+    standard: 4
+    detailed: 8
+  include_links: true
+  include_media_counts: true
+
+credibility:
+  min_independent_sources: 2    # событие «подтверждено», если N независимых источников
+  source_weight_default: 0.5
+
+media_harvest:                  # скачивание картинок/видео для материалов (Этап A)
+  enabled: true
+  max_images_per_item: 4
+  max_image_mb: 8
+  max_video_mb: 60              # больше — не качаем, оставляем ссылку
+  skip_domains: [counterexample.org]   # чёрный список CDN/доменов
+
+network:
+  proxy: null                   # напр. socks5://127.0.0.1:9050
+  timeout_sec: 20
+  retries: 3
+  user_agent_rotator: true
+  politeness_delay_sec: 2
+
+telegram:                       # Этап B + чтение каналов на Этапе A
+  api_id_env: TG_API_ID         # секреты только через env
+  api_hash_env: TG_API_HASH
+  channel_username: null        # куда публиковать (Этап B)
+
+# ==== ВЗАИМОЗАМЕНЯЕМЫЕ ИИ-БЭКЕНДЫ (единственная точка привязки к моделям) ====
+ai:
+  llm:
+    backend: ollama             # ollama | openai_compat | cloud_openai
+    model: "qwen2.5:7b-instruct"
+    base_url: "http://localhost:11434/v1"   # OpenAI-compatible endpoint
+    temperature: 0.1
+    max_tokens: 1024
+    fallback:
+      backend: openai_compat
+      model: "meta-llama/llama-3.1-8b-instruct"
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: OPENROUTER_API_KEY
+  embed:
+    backend: sentence_transformers
+    model: "cointegrated/rubert-tiny2"
+    device: auto                # cuda | cpu | auto
+  asr:
+    backend: faster_whisper
+    model: small                # tiny | base | small | medium
+    word_timestamps: true
+  tts:
+    backend: edge_tts           # edge_tts (облако, ноль VRAM) | piper (локально) | fake (тесты)
+    voice: "ru-RU-DmitryNeural" # edge: ru-RU-SvetlanaNeural; piper: ru_RU-midia-medium
+    output_dir: ./data/audio
+    fallback:                   # если edge недоступен (регион/блокировка) — локальный путь
+      backend: fake             # в бою замените на piper после `pip install piper-tts`
+  vision:
+    backend: moondream          # moondream | gpt4o_vision
+    max_images_per_item: 4
+
+# ==== ЭТАП B: видео-новость (диктор + субтитры + видеоряд) ====
+video_render:
+  enabled_video: true           # false = только аудио + srt (режим подкаста)
+  rewrite_script: true          # LLM переписывает выкладку в разговорный сценарий
+  language: ru
+  width: 1280
+  height: 720                   # для вертикальных Shorts/Reels: 720x1280
+  fps: 30
+  max_frames: 8                 # сколько кадров видеоряда максимум
+  per_image: null               # сек на слайд; null = распределить по длительности речи
+  burn_subtitles: true          # «вжечь» субтитры в видео (ASS)
+  subtitle_max_chars: 42
+  output_dir: ./data/videos
+  tts_fallback:                 # рантайм-фолбэк диктора, если основной TTS упал (сеть/регион)
+    backend: fake               # в бою: piper после `pip install piper-tts`
+
+sinks:
+  - console
+  - jsonl
+  # - telegram_channel         # включить на Этапе B

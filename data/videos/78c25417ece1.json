@@ -1,0 +1,14 @@
+{
+  "event_id": "78c25417ece1",
+  "script": "[nexta_live] ДТП под Борисовом: столкнулись два грузовика. Под Борисовом на трассе М1 произошло ДТП с участием двух грузовиков, есть пострадавшие, движение перекрыто. … [FakeLLM: тестовая выкладка уровня стиля из промпта]",
+  "audio": "data/videos/78c25417ece1.wav",
+  "subtitles_srt": "data/videos/78c25417ece1.srt",
+  "media_used": [
+    "https://example.com/photo1.jpg",
+    "https://example.com/video1.mp4"
+  ],
+  "path": "data/videos/78c25417ece1.mp4",
+  "duration": 11.567,
+  "images_used": 1,
+  "subtitles": true
+}
