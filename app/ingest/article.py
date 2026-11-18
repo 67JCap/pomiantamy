@@ -191,10 +191,8 @@ def extract_article(html: str, min_chars: int = 220) -> ArticleContent:
     parser.feed(html or "")
     parser.close()
 
-    title = (
-        (parser.headings[0] if parser.headings else "")
-        or parser.jsonld_titles[0] if parser.jsonld_titles else ""
-    )
+    title = parser.headings[0] if parser.headings else ""
+    title = title or (parser.jsonld_titles[0] if parser.jsonld_titles else "")
     title = title or parser.meta.get("og:title", "") or parser.meta.get("twitter:title", "")
     title = _plain_text(title)
 
