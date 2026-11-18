@@ -49,8 +49,21 @@ class VideoNewsRenderer:
         script = self.make_script(brief)
         base = self.out_dir / brief.event_id
 
-        # 1) голоса диктора (backend выбирается YAML-строкой: piper/edge_tts/xtts)
-        audio = self.tts.synthesize(script, str(base))
+        # 1) голос диктора (backend выбирается YAML-строкой: piper/edge_tts/xtts/fake).
+        #    Если бэкенд упал в рантайме (сеть/блокировка региона) — пробуем
+        #    tts.fallback из settings.yaml: тот же принцип graceful degradation.
+        try:
+            audio = self.tts.synthesize(script, str(base))
+        except Exception as e:  # noqa: BLE001
+            fb = self.p.get("tts_fallback") or {}
+            if not fb.get("backend"):
+                raise RuntimeError(
+                    f"TTS '{type(self.tts).__name__}' не справился: {e}. "
+                    f"Настройте video_render.tts_fallback в config/settings.yaml") from e
+            print(f"[render] TTS упал ({e}); fallback -> {fb['backend']}")
+            from app.core.registry import resolve
+            self.tts = resolve("tts", fb)
+            audio = self.tts.synthesize(script, str(base))
         duration = audio["duration"] or max(len(script) / 15.0, 5.0)
 
         # 2) субтитры: точные word-тайминги если есть, иначе оценочная раскладка

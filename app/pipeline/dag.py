@@ -63,6 +63,11 @@ class Pipeline:
             self.llm, style=cfg.get("brief", "style", default="standard"),
             max_sentences=cfg.get("brief", "max_sentences", default=None),
             language=cfg.get("brief", "language", default="ru"))
+        # скачивание картинок/видео для материалов (настраивается YAML-секцией)
+        from app.process.media_harvest import MediaHarvester
+        self.harvester = MediaHarvester(
+            self.http, cfg.get("media_harvest", default={}),
+            data_dir=cfg.get("app", "data_dir", default="./data"))
         # sinks
         self.sinks = [resolve("sink", {"backend": name})
                       for name in cfg.get("sinks", default=["console"])]
@@ -111,6 +116,10 @@ class Pipeline:
                 items += res
         self._save_state(state)
         print(f"[pipeline] собрано материалов: {len(items)}")
+
+        # 1.5) MEDIA HARVEST: скачать картинки/видео, чтобы выкладка несла файлы
+        if self.cfg.get("media_harvest", "enabled", default=True):
+            items = list(await asyncio.gather(*[self.harvester.harvest(i) for i in items]))
 
         # 2) DEDUP -> события
         new_events = self.dedup.ingest(items)

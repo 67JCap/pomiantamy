@@ -33,7 +33,17 @@ class EdgeTTSSynthesizer(ITTS):
         except FileNotFoundError as e:
             raise RuntimeError("edge-tts не установлен (pip install edge-tts)") from e
         except subprocess.CalledProcessError as e:
+            # чистим пустые файлы, чтобы следующий бэкенд/fallback писал начисто
+            Path(out).unlink(missing_ok=True)
             raise RuntimeError(f"edge-tts ошибка: {e.stderr[-200:]}") from e
+        if not out.exists() or out.stat().st_size == 0:
+            # Microsoft endpoint вернул пустоту (блокировка/ошибка голоса) —
+            # удаляем мусор и падаем ПОНЯТНОЙ ошибкой, чтобы registry/fallback
+            # мог подхватить другой TTS-бэкенд.
+            out.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"edge-tts: голос '{self.voice}' вернул пустой аудио (сервис недоступен "
+                f"или блокирует регион). Смените voice или backend в config/settings.yaml")
         duration = self._probe_duration(str(out))
         return {"path": str(out), "duration": duration, "words": None}
 

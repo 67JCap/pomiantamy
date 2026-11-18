@@ -30,12 +30,23 @@ def resolve(kind: str, cfg: dict) -> Any:
     backend = cfg["backend"]
     if backend not in _REG[kind]:
         # ленивая загрузка модуля по соглашению: app/ai/<kind>/<backend>.py
+        module_missing = False
         try:
             importlib.import_module(f"app.ai.{kind}.{backend}")
-        except ModuleNotFoundError:
-            pass
+        except ModuleNotFoundError as e:
+            # модуль бэкенда отсутствует -> неизвестный backend;
+            # но если не найден ЗАВИСИМЫЙ пакет внутри бэкенда — сообщаем явно
+            if e.name and (e.name == f"app.ai.{kind}.{backend}" or
+                           e.name.startswith(f"app.ai.{kind}.{backend}.")):
+                module_missing = True
+            else:
+                raise RuntimeError(
+                    f"Backend '{backend}' ({kind}) требует пакет '{e.name}'. "
+                    f"Установите его (requirements-full.txt) или смените backend в YAML"
+                ) from e
     if backend not in _REG[kind]:
-        raise KeyError(f"Неизвестный backend '{backend}' для '{kind}'. "
+        hint = "" if module_missing else " (модуль импортирован, но не зарегистрировался)"
+        raise KeyError(f"Неизвестный backend '{backend}' для '{kind}'.{hint} "
                        f"Доступны: {sorted(_REG[kind])}")
     return _REG[kind][backend](**{k: v for k, v in cfg.items() if k != "backend"})
 

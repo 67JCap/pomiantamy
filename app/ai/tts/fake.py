@@ -13,8 +13,10 @@ from pathlib import Path
 from typing import Any
 
 from app.core.interfaces import ITTS
+from app.core.registry import register
 
 
+@register("tts", "fake")
 class FakeTTS(ITTS):
     def __init__(self, wps: float = 2.6, **_):  # ~слов в секунду «речи»
         self.wps = wps

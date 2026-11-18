@@ -30,6 +30,13 @@ credibility:
   min_independent_sources: 2    # событие «подтверждено», если N независимых источников
   source_weight_default: 0.5
 
+media_harvest:                  # скачивание картинок/видео для материалов (Этап A)
+  enabled: true
+  max_images_per_item: 4
+  max_image_mb: 8
+  max_video_mb: 60              # больше — не качаем, оставляем ссылку
+  skip_domains: [counterexample.org]   # чёрный список CDN/доменов
+
 network:
   proxy: null                   # напр. socks5://127.0.0.1:9050
   timeout_sec: 20
@@ -64,12 +71,30 @@ ai:
     model: small                # tiny | base | small | medium
     word_timestamps: true
   tts:
-    backend: piper              # piper | xtts | elevenlabs
-    voice: "ru_RU-midia-medium"
+    backend: edge_tts           # edge_tts (облако, ноль VRAM) | piper (локально) | fake (тесты)
+    voice: "ru-RU-DmitryNeural" # edge: ru-RU-SvetlanaNeural; piper: ru_RU-midia-medium
     output_dir: ./data/audio
+    fallback:                   # если edge недоступен (регион/блокировка) — локальный путь
+      backend: fake             # в бою замените на piper после `pip install piper-tts`
   vision:
     backend: moondream          # moondream | gpt4o_vision
     max_images_per_item: 4
+
+# ==== ЭТАП B: видео-новость (диктор + субтитры + видеоряд) ====
+video_render:
+  enabled_video: true           # false = только аудио + srt (режим подкаста)
+  rewrite_script: true          # LLM переписывает выкладку в разговорный сценарий
+  language: ru
+  width: 1280
+  height: 720                   # для вертикальных Shorts/Reels: 720x1280
+  fps: 30
+  max_frames: 8                 # сколько кадров видеоряда максимум
+  per_image: null               # сек на слайд; null = распределить по длительности речи
+  burn_subtitles: true          # «вжечь» субтитры в видео (ASS)
+  subtitle_max_chars: 42
+  output_dir: ./data/videos
+  tts_fallback:                 # рантайм-фолбэк диктора, если основной TTS упал (сеть/регион)
+    backend: fake               # в бою: piper после `pip install piper-tts`
 
 sinks:
   - console
